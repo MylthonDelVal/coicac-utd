@@ -1,0 +1,91 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+}
+
+
+[id^="reader"], 
+[class*="html5-qrcode"],
+.html5-qrcode-element {
+    color: #1A1A1A !important;
+    display: inline-block !important; 
+    visibility: visible !important;
+}
+
+
+[id^="reader"] *, 
+[class*="html5-qrcode"] * {
+    color: #1A1A1A !important;
+    fill: #1A1A1A !important; 
+    opacity: 1 !important;
+}
+
+
+#reader button, 
+.html5-qrcode-element {
+    border: 1px solid #007D5F !important;
+    padding: 8px !important;
+    margin: 5px !important;
+    background-color: #f9f9f9 !important;
+    cursor: pointer !important;
+}
+
+
+
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  
+
+  background-image: url('/public/utd-campus-bg.jpg'); 
+  background-size: cover;          /* Asegura que cubra toda la pantalla */
+  background-position: center;     /* Centra la imagen */
+  background-repeat: no-repeat;    /* No repite la imagen */
+  background-attachment: fixed;    /* Mantiene el fondo fijo al hacer scroll (opcional) */
+  /* --- FIN DE ACTUALIZACIÓN --- */
+  
+  color: white;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
