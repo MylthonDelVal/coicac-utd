@@ -6,14 +6,14 @@ import ConsultaQR from './ConsultaQR'
 
 const ACCESS_PASSWORD = "1234"; 
 
-// --- COMPONENTE DE PROTECCIÓN PARA EL STAFF ---
+
 function ScannerProtector() {
   const [isStaff, setIsStaff] = useState(false);
   const [pass, setPass] = useState('');
 
   if (!isStaff) {
     return (
-      /* Fondo blanco puro para la tarjeta de acceso sobre el fondo crema */
+      
       <div className="bg-white p-10 rounded-[2.5rem] border border-[#E5DCC5] shadow-xl text-center animate-in zoom-in w-full max-w-sm mx-auto relative z-10">
         <div className="text-5xl mb-4">📸</div>
         <h2 className="text-2xl font-black mb-2 text-[#007D5F]">Acceso Staff</h2>
