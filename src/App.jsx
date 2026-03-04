@@ -6,14 +6,14 @@ import ConsultaQR from './ConsultaQR'
 
 const ACCESS_PASSWORD = "1234"; 
 
-// --- COMPONENTE DE PROTECCIÓN PARA EL STAFF ---
+
 function ScannerProtector() {
   const [isStaff, setIsStaff] = useState(false);
   const [pass, setPass] = useState('');
 
   if (!isStaff) {
     return (
-      /* Fondo blanco puro para la tarjeta de acceso sobre el fondo crema */
+      
       <div className="bg-white p-10 rounded-[2.5rem] border border-[#E5DCC5] shadow-xl text-center animate-in zoom-in w-full max-w-sm mx-auto relative z-10">
         <div className="text-5xl mb-4">📸</div>
         <h2 className="text-2xl font-black mb-2 text-[#007D5F]">Acceso Staff</h2>
@@ -48,7 +48,7 @@ function App() {
   const [cargando, setCargando] = useState(false);
   const [modalidad, setModalidad] = useState('Asistente');
 
-  // --- LÓGICA DE REGISTRO EN SUPABASE (Restaurada) ---
+  // LÓGICA DE REGISTRO EN SUPABASE 
   const manejarRegistro = async () => {
     if (!nombre || !matricula || !escuela || !correo || !archivo) {
       return alert("Por favor, llena todos los campos y sube tu comprobante.");
@@ -75,7 +75,7 @@ function App() {
     /* FONDO PRINCIPAL RESTAURADO: #FDF5E6 | TEXTO: Slate-800 */
     <div className="min-h-screen bg-[#FDF5E6] text-slate-800 font-sans selection:bg-[#F2B705] selection:text-black overflow-x-hidden flex flex-col">
       
-      {/* NAV CON LOGO COICAC Y BORDE INFERIOR CLARO */}
+      
       <nav className="p-6 flex justify-between items-center relative z-20 border-b border-[#E5DCC5] bg-white">
         <button onClick={() => setView('landing')} className="hover:opacity-80 transition-opacity flex items-center">
           <img 
@@ -89,8 +89,8 @@ function App() {
       <main className="flex-grow">
         {view === 'landing' && (
           <div className="animate-in fade-in duration-1000">
-            {/* HERO SECTION CON FOTO CAMPUS (Opción A Estilizada) */}
-            {/* HERO SECTION CORREGIDA */}
+            
+            
 <section className="max-w-7xl mx-auto px-6 py-12 md:py-24 flex flex-col md:flex-row items-center gap-12 relative z-10">
   
   
