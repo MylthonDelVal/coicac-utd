@@ -1,16 +1,22 @@
 # React + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# COICAC UTD - Sistema de Registro & QR
 
-Currently, two official plugins are available:
+Sistema Full-Stack diseñado para la gestión y validación de asistentes al **Congreso Internacional de Cuerpos Académicos** de la **Universidad Tecnológica de Durango (UTD)**.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Características
+- **Registro de Participantes:** Captura de datos y carga de comprobantes de pago.
+- **Validación Staff:** Interfaz protegida para que el staff autorice registros.
+- **Escáner Biométrico de QR:** Validación de accesos en tiempo real mediante cámara.
+- **Gestión de Modalidades:** Soporte para Ponentes, Asistentes y Carteles.
 
-## React Compiler
+## Stack Tecnológico
+- **Frontend:** React + Vite + Tailwind CSS
+- **Backend (BaaS):** Supabase (PostgreSQL)
+- **Almacenamiento:** Supabase Storage (para comprobantes)
+- **Despliegue:** Vercel
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Configuración
+El proyecto requiere las siguientes variables de entorno:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
