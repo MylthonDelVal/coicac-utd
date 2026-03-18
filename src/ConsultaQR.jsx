@@ -3,47 +3,55 @@ import { supabase } from './lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
 
 function ConsultaQR() {
-  const [matricula, setMatricula] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [participante, setParticipante] = useState(null);
   const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
 
   const consultar = async () => {
+    if (!busqueda) return setError('Por favor ingresa tu correo o matrícula.');
+    
     setError('');
+    setCargando(true);
+    
+    // Nueva lógica: Busca si el valor coincide con matricula O con correo
     const { data, error: dbError } = await supabase
       .from('participantes')
       .select('*')
-      .eq('matricula', matricula)
-      .single();
+      .or(`matricula.eq.${busqueda},correo.eq.${busqueda}`)
+      .maybeSingle(); // Usamos maybeSingle para manejar mejor si no hay resultados
 
     if (dbError || !data) {
-      setError('No se encontró ningún registro con esa matrícula.');
+      setError('No se encontró ningún registro con esos datos. Verifica que el correo sea el mismo que registraste.');
       setParticipante(null);
     } else {
       setParticipante(data);
     }
+    setCargando(false);
   };
 
   return (
-    /* Contenedor principal: Mantiene su fondo oscuro */
     <div className="bg-slate-800 p-10 rounded-[3rem] border border-slate-700 shadow-2xl text-center w-full max-w-md mx-auto animate-in fade-in relative overflow-hidden">
       
       <h2 className="text-3xl font-black mb-2 text-white uppercase italic tracking-tighter">
         Obtener <span className="text-[#32B58C]">mi pase</span>
       </h2>
-      <p className="text-slate-500 mb-8 text-[10px] font-black tracking-widest uppercase">Consulta tu estatus y descarga tu QR</p>
+      <p className="text-slate-500 mb-8 text-[10px] font-black tracking-widest uppercase">Consulta con tu Correo o Matrícula</p>
       
       <div className="space-y-4">
         <input 
           type="text" 
-          placeholder="MATRÍCULA / ID"
-          className="w-full p-5 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 text-center font-black outline-none focus:border-[#32B58C] transition-all shadow-inner"
-          onChange={(e) => setMatricula(e.target.value)}
+          placeholder="CORREO O MATRÍCULA"
+          className="w-full p-5 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 text-center font-black outline-none focus:border-[#32B58C] transition-all shadow-inner uppercase"
+          onChange={(e) => setBusqueda(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && consultar()}
         />
         <button 
           onClick={consultar} 
-          className="w-full py-5 bg-[#007D5F] text-white rounded-2xl font-black shadow-xl shadow-[#007D5F]/20 hover:bg-[#32B58C] hover:scale-[1.02] transition-all"
+          disabled={cargando}
+          className="w-full py-5 bg-[#007D5F] text-white rounded-2xl font-black shadow-xl shadow-[#007D5F]/20 hover:bg-[#32B58C] hover:scale-[1.02] transition-all disabled:opacity-50"
         >
-          CONSULTAR REGISTRO
+          {cargando ? "BUSCANDO..." : "CONSULTAR REGISTRO"}
         </button>
       </div>
 
@@ -51,15 +59,30 @@ function ConsultaQR() {
 
       {participante && (
         <div className="mt-10 p-8 bg-white rounded-[2.5rem] shadow-2xl animate-in zoom-in text-slate-900">
-          <p className="text-[10px] font-black text-[#007D5F] uppercase tracking-widest mb-1">Pase Oficial Digital</p>
-          <h3 className="text-2xl font-black uppercase mb-6 tracking-tighter">{participante.nombre_completo}</h3>
+          <p className="text-[10px] font-black text-[#007D5F] uppercase tracking-widest mb-1">Estatus de Registro</p>
+          <h3 className="text-2xl font-black uppercase mb-6 tracking-tighter leading-tight">{participante.nombre_completo}</h3>
           
-          <div className="flex justify-center mb-6 p-4 border-2 border-slate-100 rounded-3xl">
-            <QRCodeSVG value={participante.id} size={200} />
+          <div className="flex flex-col items-center justify-center mb-6 p-6 border-2 border-slate-100 rounded-3xl bg-slate-50">
+            {participante.estatus_pago === 'aprobado' ? (
+              /* QR se muestra SOLO si está aprobado */
+              <div className="animate-in fade-in duration-500">
+                <QRCodeSVG value={participante.id} size={180} />
+                <p className="mt-4 text-[9px] text-slate-400 font-bold">ID: {participante.id}</p>
+              </div>
+            ) : (
+              /* Mensaje de bloqueo si no está aprobado */
+              <div className="text-center py-4">
+                <div className="text-5xl mb-4 opacity-20">🔒</div>
+                <p className="text-slate-400 text-xs font-bold px-4 leading-relaxed">
+                  TU CÓDIGO QR SE ACTIVARÁ <br /> 
+                  <span className="text-[#007D5F]">EN CUANTO SE VALIDE TU PAGO</span>
+                </p>
+              </div>
+            )}
           </div>
           
           <p className={`font-black uppercase text-[10px] tracking-widest p-3 rounded-full ${
-            participante.estatus_pago === 'aprobado' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600 animate-pulse'
+            participante.estatus_pago === 'aprobado' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'
           }`}>
             {participante.estatus_pago === 'aprobado' ? '✓ Acceso Autorizado' : '⌛ Pago en Revisión'}
           </p>

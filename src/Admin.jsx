@@ -5,8 +5,7 @@ import Swal from 'sweetalert2';
 
 emailjs.init("-hrjleCd5-SSgiopy"); 
 
-const ADMIN_PASSWORD = "1234";
-
+const ADMIN_PASSWORD = "delval";
 
 function Admin() {
   const [participantes, setParticipantes] = useState([]);
@@ -33,15 +32,13 @@ function Admin() {
     else setParticipantes(data || []);
   };
 
-  // --- FUNCIÓN PARA ENVIAR CORREO ---
   const enviarCorreoQR = async (participante) => {
-    // Usamos el ID real para el QR
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${participante.id}`;
 
     const templateParams = {
-      nombre_alumno: participante.nombre_completo, // Automático
-      matricula: participante.matricula,           // Automático
-      email_destinatario: participante.correo,    // Automático desde tu tabla
+      nombre_alumno: participante.nombre_completo,
+      matricula: participante.matricula,
+      email_destinatario: participante.correo,
       qr_link: qrUrl,
     };
 
@@ -50,7 +47,7 @@ function Admin() {
         'service_6w99m06', 
         'template_akms1dj', 
         templateParams, 
-        'vSTxGak1fnVKocrd6' // <--- ASEGÚRATE DE QUE ESTA SEA LA QUE FUNCIONÓ
+        'vSTxGak1fnVKocrd6'
       );
       return true;
     } catch (error) {
@@ -58,6 +55,7 @@ function Admin() {
       return false;
     }
   };
+
   const cambiarEstatus = async (participante, nuevoEstatus) => {
     const { error } = await supabase
       .from('participantes')
@@ -66,7 +64,6 @@ function Admin() {
 
     if (!error) {
       if (nuevoEstatus === 'aprobado') {
-        // Mostrar aviso de que se está enviando el correo
         Swal.fire({
           title: 'Enviando QR...',
           text: 'Por favor espera un momento.',
@@ -114,9 +111,11 @@ function Admin() {
     );
   }
 
+  // Filtrado actualizado para incluir búsqueda por correo
   const filtrados = participantes.filter(p => 
     p.nombre_completo.toLowerCase().includes(busqueda.toLowerCase()) || 
-    p.matricula.includes(busqueda)
+    p.matricula.includes(busqueda) ||
+    p.correo.toLowerCase().includes(busqueda.toLowerCase())
   );
 
   return (
@@ -124,7 +123,7 @@ function Admin() {
       <div className="flex flex-col md:flex-row justify-between items-center mb-10 gap-6">
         <h2 className="text-4xl font-black italic uppercase tracking-tighter text-white">Panel <span className="text-blue-500">Admin</span></h2>
         <input 
-          type="text" placeholder="🔍 Buscar alumno..." 
+          type="text" placeholder="🔍 Buscar por nombre, matrícula o correo..." 
           className="bg-slate-900 border border-slate-700 p-5 rounded-2xl w-full md:w-96 text-white outline-none focus:border-blue-500 shadow-inner" 
           onChange={(e) => setBusqueda(e.target.value)} 
         />
@@ -134,7 +133,7 @@ function Admin() {
         <table className="w-full text-left">
           <thead>
             <tr className="text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-700/50">
-              <th className="p-5">Alumno</th>
+              <th className="p-5">Alumno / Datos</th>
               <th className="p-5">Modalidad</th>
               <th className="p-5">Ticket</th>
               <th className="p-5">Estatus</th>
@@ -145,11 +144,14 @@ function Admin() {
             {filtrados.map((p) => (
               <tr key={p.id} className="hover:bg-slate-700/20 transition-all group">
                 <td className="p-5 text-white">
-                  <p className="font-black uppercase text-sm">{p.nombre_completo}</p>
-                  <p className="text-[10px] text-slate-500 font-bold">{p.matricula}</p>
+                  <p className="font-black uppercase text-sm leading-tight">{p.nombre_completo}</p>
+                  <div className="flex flex-col mt-1">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">🆔 {p.matricula || 'N/A'}</p>
+                    <p className="text-[10px] text-blue-400 font-bold lowercase">✉️ {p.correo}</p>
+                  </div>
                 </td>
                 <td className="p-5">
-                  <span className="bg-blue-500/10 text-blue-400 border border-blue-500/30 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest italic shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                  <span className="bg-blue-500/10 text-blue-400 border border-blue-500/30 px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-widest italic">
                     {p.modalidades?.nombre || "Asistente"}
                   </span>
                 </td>
@@ -165,9 +167,8 @@ function Admin() {
                 </td>
                 <td className="p-5 text-right">
                   <div className="flex gap-2 justify-end">
-                    {/* PASAMOS EL OBJETO 'p' COMPLETO EN LUGAR DE SOLO EL ID */}
-                    <button onClick={() => cambiarEstatus(p, 'aprobado')} className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-900/20 hover:scale-110 transition-transform">✅</button>
-                    <button onClick={() => cambiarEstatus(p, 'rechazado')} className="p-3 bg-red-600 text-white rounded-xl shadow-lg shadow-red-900/20 hover:scale-110 transition-transform">❌</button>
+                    <button onClick={() => cambiarEstatus(p, 'aprobado')} title="Aprobar y enviar QR" className="p-3 bg-emerald-600 text-white rounded-xl shadow-lg shadow-emerald-900/20 hover:scale-110 transition-transform">✅</button>
+                    <button onClick={() => cambiarEstatus(p, 'rechazado')} title="Rechazar" className="p-3 bg-red-600 text-white rounded-xl shadow-lg shadow-red-900/20 hover:scale-110 transition-transform">❌</button>
                   </div>
                 </td>
               </tr>
