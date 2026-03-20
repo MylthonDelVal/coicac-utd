@@ -72,15 +72,23 @@ function App() {
       const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombreArchivo);
       
       
-      const { error: dbError } = await supabase.from('participantes').insert([{
-        nombre_completo: nombre, 
-        matricula: matricula.trim() === "" ? null : matricula, 
-        escuela, 
-        correo,
-        modalidad_id: modalidadesMap[modalidad], 
-        url_comprobante: urlData.publicUrl, 
-        estatus_pago: 'pendiente'
-      }]);
+     
+
+
+const matriculaFinal = matricula.trim() === "" 
+  ? `INV-${Date.now()}` 
+  : matricula;
+
+const { error: dbError } = await supabase.from('participantes').insert([{
+  nombre_completo: nombre, 
+  matricula: matriculaFinal, 
+  escuela, 
+  correo,
+  modalidad_id: modalidadesMap[modalidad], 
+  url_comprobante: urlData.publicUrl, 
+  estatus_pago: 'pendiente'
+}]);
+
 
       if (dbError) throw dbError;
       alert("¡Registro enviado con éxito! Validaremos tu pago pronto.");
