@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { supabase } from './lib/supabase';
-import Swal from 'sweetalert2'; // Importamos SweetAlert2
+import Swal from 'sweetalert2'; 
 
 function Scanner() {
   const [diaActual, setDiaActual] = useState(1);
@@ -138,7 +138,6 @@ function Scanner() {
         Escáner <span className="text-emerald-500 text-3xl">Staff</span>
       </h2>
       
-      {/* ... resto de tu código de los botones DÍA 1, 2, 3 ... */}
 
       <div className="flex gap-2 mb-8 bg-slate-900 p-1.5 rounded-2xl border border-slate-700 shadow-inner">
         {[1, 2, 3].map(d => (
