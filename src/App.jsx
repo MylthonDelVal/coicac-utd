@@ -76,21 +76,20 @@ function App() {
 
 
 const matriculaFinal = matricula.trim() === "" 
-  ? `INV-${Date.now()}` 
-  : matricula;
+      ? `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}` 
+      : matricula;
 
-const { error: dbError } = await supabase.from('participantes').insert([{
-  nombre_completo: nombre, 
-  matricula: matriculaFinal, 
-  escuela, 
-  correo,
-  modalidad_id: modalidadesMap[modalidad], 
-  url_comprobante: urlData.publicUrl, 
-  estatus_pago: 'pendiente'
-}]);
+    const { error: dbError } = await supabase.from('participantes').insert([{
+      nombre_completo: nombre, 
+      matricula: matriculaFinal, 
+      escuela, 
+      correo,
+      modalidad_id: modalidadesMap[modalidad], 
+      url_comprobante: urlData.publicUrl, 
+      estatus_pago: 'pendiente'
+    }]);
 
-
-      if (dbError) throw dbError;
+    if (dbError) throw dbError;
       alert("¡Registro enviado con éxito! Validaremos tu pago pronto.");
       setView('landing');
     } catch (error) { 
