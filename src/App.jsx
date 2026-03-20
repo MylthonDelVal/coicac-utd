@@ -42,13 +42,13 @@ function App() {
   const [matricula, setMatricula] = useState('');
   const [escuela, setEscuela] = useState('');
   const [correo, setCorreo] = useState('');
-  const [confirmarCorreo, setConfirmarCorreo] = useState(''); // Nuevo campo
+  const [confirmarCorreo, setConfirmarCorreo] = useState(''); 
   const [archivo, setArchivo] = useState(null);
   const [cargando, setCargando] = useState(false);
   const [modalidad, setModalidad] = useState('Asistente');
 
   const manejarRegistro = async () => {
-    // Matrícula ya no es obligatoria en la validación
+    
     if (!nombre || !escuela || !correo || !confirmarCorreo || !archivo) {
       return alert("Por favor, llena los campos obligatorios (*) y sube tu comprobante.");
     }
@@ -71,9 +71,10 @@ function App() {
       
       const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombreArchivo);
       
+      
       const { error: dbError } = await supabase.from('participantes').insert([{
         nombre_completo: nombre, 
-        matricula: matricula || 'N/A', // Guardar N/A si está vacío
+        matricula: matricula.trim() === "" ? null : matricula, 
         escuela, 
         correo,
         modalidad_id: modalidadesMap[modalidad], 
@@ -82,7 +83,7 @@ function App() {
       }]);
 
       if (dbError) throw dbError;
-      alert("🚀 ¡Registro enviado con éxito! Validaremos tu pago pronto.");
+      alert("¡Registro enviado con éxito! Validaremos tu pago pronto.");
       setView('landing');
     } catch (error) { 
         alert("Error: " + error.message); 
