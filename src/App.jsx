@@ -11,6 +11,14 @@ function ScannerProtector() {
   const [isStaff, setIsStaff] = useState(false);
   const [pass, setPass] = useState('');
 
+  const verificarAcceso = () => {
+    if (pass === ACCESS_PASSWORD) {
+      setIsStaff(true);
+    } else {
+      Swal.fire({ icon: 'error', title: 'Acceso Denegado', text: 'Clave incorrecta', confirmButtonColor: '#007D5F' });
+    }
+  };
+
   if (!isStaff) {
     return (
       <div className="bg-white p-10 rounded-[2.5rem] border border-[#E5DCC5] shadow-xl text-center animate-in zoom-in w-full max-w-sm mx-auto relative z-10">
@@ -23,10 +31,10 @@ function ScannerProtector() {
           className="w-full p-4 rounded-2xl bg-[#FDF5E6] border border-[#E5DCC5] text-slate-800 mb-4 text-center outline-none focus:ring-2 focus:ring-[#32B58C] transition-all"
           value={pass}
           onChange={(e) => setPass(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && (pass === ACCESS_PASSWORD ? setIsStaff(true) : alert("❌ Clave incorrecta"))}
+          onKeyDown={(e) => e.key === 'Enter' && verificarAcceso()}
         />
         <button 
-          onClick={() => pass === ACCESS_PASSWORD ? setIsStaff(true) : alert("❌ Clave incorrecta")}
+          onClick={verificarAcceso}
           className="w-full bg-[#007D5F] text-white p-4 rounded-2xl font-black hover:bg-[#32B58C] transition-all shadow-md"
         >
           Activar Cámara
@@ -41,16 +49,21 @@ function App() {
   const [view, setView] = useState('landing');
   const [nombre, setNombre] = useState('');
   const [matricula, setMatricula] = useState('');
-  const [escuela, setEscuela] = useState('');
+  const [institucion, setInstitucion] = useState(''); // Nuevo
   const [correo, setCorreo] = useState('');
   const [confirmarCorreo, setConfirmarCorreo] = useState(''); 
   const [archivo, setArchivo] = useState(null);
   const [cargando, setCargando] = useState(false);
-  const [modalidad, setModalidad] = useState('Asistente');
+  
+  // Nuevos campos de logística
+  const [tipoParticipacion, setTipoParticipacion] = useState('Asistente');
+  const [modalidadAsistencia, setModalidadAsistencia] = useState('presencial');
+  const [tieneHospedaje, setTieneHospedaje] = useState('no');
+  const [detalleHospedaje, setDetalleHospedaje] = useState('');
 
   const manejarRegistro = async () => {
-    // 1. Validaciones iniciales de campos obligatorios
-    if (!nombre || !escuela || !correo || !confirmarCorreo || !archivo) {
+    // 1. Validaciones
+    if (!nombre || !institucion || !correo || !confirmarCorreo || !archivo) {
       return Swal.fire({
         icon: 'warning',
         title: 'Campos incompletos',
@@ -59,7 +72,6 @@ function App() {
       });
     }
 
-    // 2. Validación de coincidencia de correo
     if (correo.trim().toLowerCase() !== confirmarCorreo.trim().toLowerCase()) {
       return Swal.fire({
         icon: 'error',
@@ -75,12 +87,11 @@ function App() {
       const nombreLimpio = nombre.trim();
       const correoLimpio = correo.trim().toLowerCase();
 
-      // 3. BLOQUEO DE DUPLICADOS: Buscar si ya existe Nombre + Correo
-      const { data: existente, error: errorCheck } = await supabase
+      // 2. Bloqueo de duplicados por correo
+      const { data: existente } = await supabase
         .from('participantes')
         .select('id')
         .eq('correo', correoLimpio)
-        //.eq('nombre_completo', nombreLimpio)
         .maybeSingle();
 
       if (existente) {
@@ -88,13 +99,12 @@ function App() {
         return Swal.fire({
           icon: 'info',
           title: 'Registro ya existe',
-          text: 'Ya tenemos un registro con este nombre y correo. Si no tienes tu pase, usa la opción "Obtener mi QR".',
+          text: 'Este correo ya tiene un registro. Usa "Obtener mi QR" para ver tu pase.',
           confirmButtonColor: '#007D5F'
         });
       }
 
-      // 4. Configuración y subida del archivo (comprobante)
-      const modalidadesMap = { 'Asistente': 1, 'Ponente': 2, 'Cartel': 3 };
+      // 3. Subida de archivo
       const extension = archivo.name.split('.').pop();
       const idArchivo = matricula.trim() || nombreLimpio.replace(/\s+/g, '_').toLowerCase();
       const nombreArchivo = `${Date.now()}_${idArchivo}.${extension}`;
@@ -109,58 +119,48 @@ function App() {
         .from('comprobantes')
         .getPublicUrl(nombreArchivo);
 
-      // 5. Generación de matrícula si es invitado
+      // 4. Matrícula final
       const matriculaFinal = matricula.trim() === "" 
         ? `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}` 
         : matricula.trim();
 
-      // 6. Inserción final en la base de datos
+      // 5. Inserción en DB
       const { error: dbError } = await supabase.from('participantes').insert([{
         nombre_completo: nombreLimpio, 
         matricula: matriculaFinal, 
-        escuela: escuela.trim(), 
+        institucion: institucion.trim(), 
         correo: correoLimpio,
-        modalidad_id: modalidadesMap[modalidad], 
+        tipo_participacion: tipoParticipacion, 
+        modalidad: modalidadAsistencia,
+        tiene_hospedaje: tieneHospedaje === 'si',
+        detalle_hospedaje: tieneHospedaje === 'si' ? detalleHospedaje : 'N/A',
         url_comprobante: urlData.publicUrl, 
         estatus_pago: 'pendiente'
       }]);
 
       if (dbError) throw dbError;
 
-      // 7. Éxito
       Swal.fire({
         icon: 'success',
         title: '¡Registro exitoso!',
-        text: 'Tu información ha sido enviada. Validaremos tu pago en las próximas horas.',
-        confirmButtonColor: '#007D5F',
-        timer: 4000
+        text: 'Validaremos tu pago en las próximas horas.',
+        confirmButtonColor: '#007D5F'
       });
 
-      // Limpiar formulario y volver al inicio
-      setNombre('');
-      setMatricula('');
-      setCorreo('');
-      setConfirmarCorreo('');
-      setEscuela('');
-      setArchivo(null);
+      // Limpiar y resetear
+      setNombre(''); setMatricula(''); setCorreo(''); setConfirmarCorreo('');
+      setInstitucion(''); setArchivo(null); setDetalleHospedaje('');
       setView('landing');
 
     } catch (error) { 
-      Swal.fire({
-        icon: 'error',
-        title: 'Hubo un error',
-        text: 'No pudimos completar tu registro: ' + error.message,
-        confirmButtonColor: '#d33'
-      });
-    } finally { 
-      setCargando(false); 
-    }
+      Swal.fire({ icon: 'error', title: 'Hubo un error', text: error.message });
+    } finally { setCargando(false); }
   };
 
   return (
     <div className="min-h-screen bg-[#FDF5E6] text-slate-800 font-sans selection:bg-[#F2B705] selection:text-black overflow-x-hidden flex flex-col">
       <nav className="p-6 flex justify-between items-center relative z-20 border-b border-[#E5DCC5] bg-white">
-        <button onClick={() => setView('landing')} className="hover:opacity-80 transition-opacity flex items-center">
+        <button onClick={() => setView('landing')} className="hover:opacity-80 transition-opacity">
           <img src="/logo.png" alt="COICAC Logo" className="h-14 w-auto object-contain" />
         </button>
       </nav>
@@ -168,64 +168,51 @@ function App() {
       <main className="flex-grow">
         {view === 'landing' && (
           <div className="animate-in fade-in duration-1000">
+            {/* HERO SECTION */}
             <section className="max-w-7xl mx-auto px-6 py-12 md:py-24 flex flex-col md:flex-row items-center gap-12 relative z-10">
               <div className="md:w-3/5 text-center md:text-left">
                 <h1 className="text-5xl md:text-7xl font-black leading-[0.9] mb-6 tracking-tighter italic text-slate-900">
                   CONGRESO INTERNACIONAL <br />
                   <span className="text-[#007D5F] not-italic">DE CUERPOS ACADEMICOS UTD.</span>
                 </h1>
-                <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-xl font-medium leading-relaxed">
-                  El congreso de tecnología más esperado por la UTD. Regístrate, sube tu comprobante y obtén tu acceso digital.
+                <p className="text-lg md:text-xl text-slate-600 mb-10 max-w-xl font-medium">
+                  Regístrate, sube tu comprobante y obtén tu acceso digital para el evento de tecnología más esperado.
                 </p>
                 <div className="flex flex-col md:flex-row gap-4 justify-center md:justify-start">
-                  <button 
-                    onClick={() => setView('consulta')} 
-                    className="bg-[#F2B705] text-black px-10 py-5 rounded-2xl font-black text-lg shadow-xl shadow-[#F2B705]/20 hover:-translate-y-1 transition-all active:scale-95"
-                  >
+                  <button onClick={() => setView('consulta')} className="bg-[#F2B705] text-black px-10 py-5 rounded-2xl font-black text-lg shadow-xl hover:-translate-y-1 transition-all">
                     OBTENER MI QR
                   </button>
                 </div>
               </div>
-              <div className="relative flex justify-center items-center md:w-2/5 mt-10 md:mt-0">
-                <div className="relative w-full max-w-md aspect-[4/3] rounded-[3rem] border-4 border-[#32B58C] overflow-hidden shadow-2xl shadow-black/10 group bg-white">
-                  <img src="/utd-campus-bg.jpg" alt="Campus UTD" className="w-full h-full object-cover group-hover:scale-110 transition-all duration-700 ease-in-out" />
+              <div className="md:w-2/5 flex justify-center">
+                <div className="w-full max-w-md aspect-[4/3] rounded-[3rem] border-4 border-[#32B58C] overflow-hidden shadow-2xl bg-white">
+                  <img src="/utd-campus-bg.jpg" alt="Campus UTD" className="w-full h-full object-cover" />
                 </div>
               </div>
             </section>
 
+            {/* SELECCION DE PARTICIPACION */}
             <section className="py-20 px-6 bg-[#F5E9D3] border-y border-[#E5DCC5]">
               <div className="max-w-7xl mx-auto text-center">
                 <h2 className="text-4xl font-black mb-16 uppercase italic tracking-widest text-[#007D5F]/60">Selecciona tu participación</h2>
                 <div className="grid md:grid-cols-3 gap-8">
-                  {/* PONENTE */}
-                  <div className="bg-white p-10 rounded-[2.5rem] border border-[#E5DCC5] hover:shadow-xl transition-all group">
-                    <div className="text-5xl mb-6">🎙️</div>
-                    <h3 className="text-3xl font-black mb-4 uppercase text-[#007D5F]">Ponente</h3>
-                    <p className="text-slate-600 text-sm mb-8">Presenta tus trabajos ante la comunidad y obtén constancia oficial.</p>
-                    <button onClick={() => { setModalidad('Ponente'); setView('generator'); }} className="w-full py-4 bg-[#FDF5E6] text-[#007D5F] border border-[#007D5F] rounded-2xl font-black hover:bg-[#007D5F] hover:text-white transition-all">INSCRIBIRSE</button>
-                  </div>
-                  {/* ASISTENTE */}
-                  <div className="relative p-10 rounded-[3rem] bg-[#007D5F] border border-[#32B58C] shadow-2xl scale-105 z-10 text-white">
-                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-[#F2B705] text-black text-[11px] font-black px-6 py-2 rounded-full shadow-lg uppercase">MÁS POPULAR</div>
-                    <div className="text-5xl mb-6">👥</div>
-                    <h3 className="text-3xl font-black mb-4 uppercase">Asistente</h3>
-                    <p className="text-emerald-50 text-sm mb-8">Acceso total a conferencias magistrales, talleres y kit de bienvenida.</p>
-                    <button onClick={() => { setModalidad('Asistente'); setView('generator'); }} className="w-full py-4 bg-white text-[#007D5F] rounded-2xl font-black hover:bg-[#F2B705] hover:text-black transition-all shadow-xl">INSCRIBIRSE</button>
-                  </div>
-                  {/* CARTEL */}
-                  <div className="bg-white p-10 rounded-[2.5rem] border border-[#E5DCC5] hover:shadow-xl transition-all group">
-                    <div className="text-5xl mb-6">🖼️</div>
-                    <h3 className="text-3xl font-black mb-4 uppercase text-[#007D5F]">Cartel</h3>
-                    <p className="text-slate-600 text-sm mb-8">Exhibe carteles científicos sobre tus proyectos en el área de exposición.</p>
-                    <button onClick={() => { setModalidad('Cartel'); setView('generator'); }} className="w-full py-4 bg-[#FDF5E6] text-[#007D5F] border border-[#007D5F] rounded-2xl font-black hover:bg-[#007D5F] hover:text-white transition-all">INSCRIBIRSE</button>
-                  </div>
+                  {['Ponente', 'Asistente', 'Cartel'].map((tipo) => (
+                    <div key={tipo} className={`p-10 rounded-[2.5rem] border transition-all ${tipo === 'Asistente' ? 'bg-[#007D5F] text-white scale-105 shadow-2xl border-[#32B58C]' : 'bg-white border-[#E5DCC5]'}`}>
+                      {tipo === 'Asistente' && <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-[#F2B705] text-black text-[11px] font-black px-6 py-2 rounded-full uppercase">MÁS POPULAR</div>}
+                      <div className="text-5xl mb-6">{tipo === 'Ponente' ? '🎙️' : tipo === 'Asistente' ? '👥' : '🖼️'}</div>
+                      <h3 className="text-3xl font-black mb-4 uppercase">{tipo}</h3>
+                      <button onClick={() => { setTipoParticipacion(tipo); setView('generator'); }} className={`w-full py-4 rounded-2xl font-black transition-all ${tipo === 'Asistente' ? 'bg-white text-[#007D5F] hover:bg-[#F2B705] hover:text-black' : 'bg-[#FDF5E6] text-[#007D5F] border border-[#007D5F] hover:bg-[#007D5F] hover:text-white'}`}>
+                        INSCRIBIRSE
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </section>
           </div>
         )}
 
-        <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col items-center justify-center min-h-[60vh] relative">
+        <div className="max-w-7xl mx-auto px-6 py-10 flex flex-col items-center justify-center min-h-[60vh]">
           {view !== 'landing' && (
             <button onClick={() => setView('landing')} className="mb-10 font-bold text-[#007D5F] hover:text-[#32B58C] transition-all flex items-center gap-2 group">
               <span className="group-hover:-translate-x-1 transition-transform">←</span> VOLVER AL INICIO
@@ -233,48 +220,72 @@ function App() {
           )}
 
           {view === 'generator' && (
-            <div className="w-full max-w-lg bg-white p-10 rounded-[3rem] border border-[#E5DCC5] shadow-2xl animate-in slide-in-from-bottom-5 relative z-10">
-              <h2 className="text-4xl font-black mb-2 italic tracking-tighter uppercase text-slate-900">Registro <span className="text-[#007D5F]">{modalidad}</span></h2>
+            <div className="w-full max-w-lg bg-white p-10 rounded-[3rem] border border-[#E5DCC5] shadow-2xl animate-in slide-in-from-bottom-5">
+              <h2 className="text-4xl font-black mb-2 italic tracking-tighter uppercase text-slate-900">Registro <span className="text-[#007D5F]">{tipoParticipacion}</span></h2>
               <p className="text-slate-400 mb-8 font-bold text-xs tracking-widest uppercase">Datos oficiales</p>
               
               <div className="space-y-6 text-left">
                 {/* NOMBRE */}
                 <div>
                   <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Nombre Completo <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="Ej. Juan Pérez" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20 text-slate-800" onChange={(e) => setNombre(e.target.value)} />
+                  <input type="text" placeholder="Ej. Juan Pérez" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20" onChange={(e) => setNombre(e.target.value)} />
                 </div>
 
-                {/* MATRICULA (OPCIONAL) */}
+                {/* INSTITUCION */}
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Institución de Procedencia <span className="text-red-500">*</span></label>
+                  <input type="text" placeholder="Ej. UTD, ITD, UNAM" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20" onChange={(e) => setInstitucion(e.target.value)} />
+                </div>
+
+                {/* MATRICULA */}
                 <div>
                   <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Matrícula (Opcional)</label>
-                  <input type="text" placeholder="Tu matrícula UTD" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20 text-slate-800" onChange={(e) => setMatricula(e.target.value)} />
+                  <input type="text" placeholder="Tu matrícula UTD" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none" onChange={(e) => setMatricula(e.target.value)} />
+                </div>
+
+                {/* MODALIDAD */}
+                <div>
+                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Modalidad de Asistencia</label>
+                  <select className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none" onChange={(e) => setModalidadAsistencia(e.target.value)}>
+                    <option value="presencial">PRESENCIAL</option>
+                    <option value="virtual">VIRTUAL</option>
+                  </select>
                 </div>
 
                 {/* CORREO */}
-                <div>
-                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Correo Electrónico <span className="text-red-500">*</span></label>
-                  <input type="email" placeholder="correo@ejemplo.com" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20 text-slate-800" onChange={(e) => setCorreo(e.target.value)} />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2 text-[9px]">Correo Electrónico *</label>
+                    <input type="email" placeholder="correo@ej" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-4 rounded-2xl outline-none" onChange={(e) => setCorreo(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2 text-[9px]">Confirmar Correo *</label>
+                    <input type="email" placeholder="repite correo" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-4 rounded-2xl outline-none" onChange={(e) => setConfirmarCorreo(e.target.value)} />
+                  </div>
                 </div>
 
-                {/* CONFIRMAR CORREO */}
-                <div>
-                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Confirmar Correo <span className="text-red-500">*</span></label>
-                  <input type="email" placeholder="Repite tu correo" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20 text-slate-800" onChange={(e) => setConfirmarCorreo(e.target.value)} />
-                </div>
-
-                {/* CARRERA */}
-                <div>
-                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Carrera / Especialidad <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="Ej. TI Desarrollo de Software" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20 text-slate-800" onChange={(e) => setEscuela(e.target.value)} />
+                {/* HOSPEDAJE */}
+                <div className="p-6 bg-[#FDF5E6] rounded-3xl border border-[#E5DCC5]">
+                  <label className="block text-xs font-black text-slate-500 mb-4 uppercase text-center tracking-widest">¿Cuentas con hospedaje?</label>
+                  <div className="flex justify-around mb-4">
+                    {['si', 'no'].map((opc) => (
+                      <label key={opc} className="flex items-center gap-2 cursor-pointer font-bold uppercase text-xs">
+                        <input type="radio" name="hosp" value={opc} checked={tieneHospedaje === opc} onChange={(e) => setTieneHospedaje(e.target.value)} className="accent-[#007D5F]" /> {opc}
+                      </label>
+                    ))}
+                  </div>
+                  {tieneHospedaje === 'si' && (
+                    <input type="text" placeholder="¿En dónde te hospedarás?" className="w-full bg-white border border-[#E5DCC5] p-4 rounded-xl text-xs animate-in slide-in-from-top-2" onChange={(e) => setDetalleHospedaje(e.target.value)} />
+                  )}
                 </div>
 
                 {/* COMPROBANTE */}
-                <div className="bg-[#FDF5E6] p-6 rounded-2xl border-2 border-dashed border-[#E5DCC5] text-center group hover:border-[#007D5F]/50 transition-all">
-                  <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-widest">Comprobante de Pago <span className="text-red-500">*</span></label>
-                  <input type="file" accept="image/*" className="text-xs text-slate-400 file:bg-[#007D5F] file:text-white file:border-0 file:rounded-full file:px-4 file:py-2 file:font-bold file:mr-4 file:cursor-pointer" onChange={(e) => setArchivo(e.target.files[0])} />
+                <div className="bg-[#FDF5E6] p-6 rounded-2xl border-2 border-dashed border-[#E5DCC5] text-center">
+                  <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-widest">Comprobante de Pago *</label>
+                  <input type="file" accept="image/*" className="text-[10px]" onChange={(e) => setArchivo(e.target.files[0])} />
                 </div>
 
-                <button onClick={manejarRegistro} disabled={cargando} className="w-full py-6 bg-[#007D5F] text-white rounded-2xl font-black shadow-xl shadow-[#007D5F]/20 active:scale-95 transition-all uppercase tracking-widest hover:bg-[#32B58C]">
+                <button onClick={manejarRegistro} disabled={cargando} className="w-full py-6 bg-[#007D5F] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all uppercase hover:bg-[#32B58C]">
                   {cargando ? "ENVIANDO..." : "FINALIZAR REGISTRO"}
                 </button>
               </div>
@@ -288,11 +299,11 @@ function App() {
       </main>
 
       <footer className="w-full py-10 border-t border-[#E5DCC5] bg-white">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col md:row justify-between items-center gap-6 text-center md:text-left">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-slate-400 text-[10px] font-bold tracking-[0.2em] uppercase">© 2026 Universidad Tecnológica de Durango</p>
           <div className="flex gap-8">
-            <button onClick={() => setView('scanner')} className="text-[10px] font-black text-slate-500 hover:text-[#007D5F] transition-all uppercase tracking-[0.2em]">🔒 Staff</button>
-            <button onClick={() => setView('admin')} className="text-[10px] font-black text-slate-500 hover:text-[#F2B705] transition-all uppercase tracking-[0.2em]">⚙️ Admin</button>
+            <button onClick={() => setView('scanner')} className="text-[10px] font-black text-slate-500 hover:text-[#007D5F] uppercase tracking-[0.2em]">🔒 Staff</button>
+            <button onClick={() => setView('admin')} className="text-[10px] font-black text-slate-500 hover:text-[#F2B705] uppercase tracking-[0.2em]">⚙️ Admin</button>
           </div>
         </div>
       </footer>
