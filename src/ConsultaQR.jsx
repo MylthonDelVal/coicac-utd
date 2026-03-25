@@ -1,44 +1,70 @@
 import { useState } from 'react';
 import { supabase } from './lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
+import Swal from 'sweetalert2'; // Importamos SweetAlert
 
 function ConsultaQR() {
   const [busqueda, setBusqueda] = useState('');
-  const [participante, setParticipante] = useState(null); // Registro seleccionado
-  const [listaRegistros, setListaRegistros] = useState([]); // Nueva lista para múltiples resultados
-  const [error, setError] = useState('');
+  const [participante, setParticipante] = useState(null);
+  const [listaRegistros, setListaRegistros] = useState([]); 
   const [cargando, setCargando] = useState(false);
 
   const consultar = async () => {
-    if (!busqueda) return setError('Por favor ingresa tu correo o matrícula.');
+    // Limpiamos la búsqueda: sin espacios y en minúsculas
+    const busquedaLimpia = busqueda.trim().toLowerCase();
     
-    setError('');
+    if (!busquedaLimpia) {
+        return Swal.fire({
+            icon: 'info',
+            title: 'Campo vacío',
+            text: 'Por favor ingresa tu correo o matrícula.',
+            confirmButtonColor: '#007D5F'
+        });
+    }
+
     setCargando(true);
     setParticipante(null);
     setListaRegistros([]);
     
-    // 1. Quitamos .maybeSingle() para que nos traiga TODOS los que coincidan
-    const { data, error: dbError } = await supabase
-      .from('participantes')
-      .select('*')
-      .or(`matricula.eq.${busqueda},correo.eq.${busqueda}`)
-      .order('created_at', { ascending: false }); 
+    try {
+        // Buscamos en la base de datos
+        const { data, error: dbError } = await supabase
+          .from('participantes')
+          .select('*')
+          .or(`correo.eq.${busquedaLimpia},matricula.eq.${busquedaLimpia}`)
+          .order('created_at', { ascending: false });
 
-    if (dbError || !data || data.length === 0) {
-      setError('No se encontró ningún registro con esos datos. Verifica que el correo sea el mismo que registraste.');
-      setCargando(false);
-      return;
+        if (dbError || !data || data.length === 0) {
+          // Reintento: búsqueda exacta solo por correo por si el .or dio problemas
+          const { data: dataReintento } = await supabase
+            .from('participantes')
+            .select('*')
+            .eq('correo', busquedaLimpia);
+            
+          if (!dataReintento || dataReintento.length === 0) {
+            Swal.fire({
+                icon: 'error',
+                title: 'No encontrado',
+                text: 'No hay registros con esos datos. Asegúrate de usar el correo exacto con el que te registraste.',
+                confirmButtonColor: '#007D5F'
+            });
+            setCargando(false);
+            return;
+          }
+          
+          if (dataReintento.length === 1) setParticipante(dataReintento[0]);
+          else setListaRegistros(dataReintento);
+          
+        } else {
+          // Si encontró registros
+          if (data.length === 1) setParticipante(data[0]);
+          else setListaRegistros(data);
+        }
+    } catch (err) {
+        Swal.fire({ icon: 'error', title: 'Error de conexión', text: err.message });
+    } finally {
+        setCargando(false);
     }
-
-    // 2. Si solo hay uno, lo mostramos directo como antes
-    if (data.length === 1) {
-      setParticipante(data[0]);
-    } else {
-      // 3. Si hay varios, guardamos la lista para que el usuario elija
-      setListaRegistros(data);
-    }
-    
-    setCargando(false);
   };
 
   return (
@@ -54,6 +80,7 @@ function ConsultaQR() {
           type="text" 
           placeholder="CORREO O MATRÍCULA"
           className="w-full p-5 rounded-2xl bg-slate-900 border border-slate-700 text-white placeholder:text-slate-600 text-center font-black outline-none focus:border-[#32B58C] transition-all shadow-inner uppercase"
+          value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && consultar()}
         />
@@ -66,12 +93,10 @@ function ConsultaQR() {
         </button>
       </div>
 
-      {error && <p className="mt-6 text-red-400 font-bold text-sm bg-red-900/20 p-4 rounded-xl border border-red-500/20">{error}</p>}
-
-      {/* --- SELECTOR DE REGISTROS (Si hay varios) --- */}
+      {/* Selector de registros */}
       {listaRegistros.length > 1 && !participante && (
         <div className="mt-8 space-y-3 animate-in slide-in-from-top-4">
-          <p className="text-white text-xs font-black uppercase mb-4 tracking-widest">Se encontraron {listaRegistros.length} registros:</p>
+          <p className="text-white text-xs font-black uppercase mb-4 tracking-widest">Registros encontrados:</p>
           {listaRegistros.map((reg) => (
             <button
               key={reg.id}
@@ -80,14 +105,14 @@ function ConsultaQR() {
             >
               <p className="text-[#32B58C] font-black uppercase text-sm group-hover:scale-[1.02] transition-transform">{reg.nombre_completo}</p>
               <p className="text-slate-500 text-[9px] font-bold mt-1 uppercase">
-                Registro: {new Date(reg.created_at).toLocaleDateString()}
+                {new Date(reg.created_at).toLocaleDateString()} - {reg.estatus_pago}
               </p>
             </button>
           ))}
         </div>
       )}
 
-      {/* --- VISTA DEL QR (Individual) --- */}
+      {/* Vista del QR */}
       {participante && (
         <div className="mt-10 p-8 bg-white rounded-[2.5rem] shadow-2xl animate-in zoom-in text-slate-900">
           <p className="text-[10px] font-black text-[#007D5F] uppercase tracking-widest mb-1">Estatus de Registro</p>
@@ -103,8 +128,8 @@ function ConsultaQR() {
               <div className="text-center py-4">
                 <div className="text-5xl mb-4 opacity-20">🔒</div>
                 <p className="text-slate-400 text-xs font-bold px-4 leading-relaxed">
-                  TU CÓDIGO QR SE ACTIVARÁ <br /> 
-                  <span className="text-[#007D5F]">EN CUANTO SE VALIDE TU PAGO</span>
+                  QR SE ACTIVARÁ AL <br /> 
+                  <span className="text-[#007D5F]">VALIDAR TU PAGO</span>
                 </p>
               </div>
             )}
@@ -116,7 +141,6 @@ function ConsultaQR() {
             {participante.estatus_pago === 'aprobado' ? '✓ Acceso Autorizado' : '⌛ Pago en Revisión'}
           </p>
 
-          {/* Botón para volver a la lista si hay múltiples registros */}
           {listaRegistros.length > 1 && (
             <button 
               onClick={() => setParticipante(null)}

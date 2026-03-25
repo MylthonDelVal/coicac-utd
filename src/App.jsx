@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 import Scanner from './Scanner'
 import Admin from './Admin'
 import ConsultaQR from './ConsultaQR'
+import Swal from 'sweetalert2'
 
 const ACCESS_PASSWORD = "delval"; 
 
@@ -48,66 +49,111 @@ function App() {
   const [modalidad, setModalidad] = useState('Asistente');
 
   const manejarRegistro = async () => {
-    
+    // 1. Validaciones iniciales de campos obligatorios
     if (!nombre || !escuela || !correo || !confirmarCorreo || !archivo) {
-      return alert("Por favor, llena los campos obligatorios (*) y sube tu comprobante.");
+      return Swal.fire({
+        icon: 'warning',
+        title: 'Campos incompletos',
+        text: 'Por favor, llena los campos obligatorios (*) y sube tu comprobante.',
+        confirmButtonColor: '#007D5F'
+      });
     }
 
-    // Validación de doble correo
-    if (correo !== confirmarCorreo) {
-      return alert("❌ Los correos electrónicos no coinciden.");
+    // 2. Validación de coincidencia de correo
+    if (correo.trim().toLowerCase() !== confirmarCorreo.trim().toLowerCase()) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'Correos no coinciden',
+        text: 'Los correos electrónicos ingresados no son iguales.',
+        confirmButtonColor: '#007D5F'
+      });
     }
 
-    
-    setCargando(true); 
+    setCargando(true);
+
     try {
+      const nombreLimpio = nombre.trim();
+      const correoLimpio = correo.trim().toLowerCase();
+
+      // 3. BLOQUEO DE DUPLICADOS: Buscar si ya existe Nombre + Correo
       const { data: existente, error: errorCheck } = await supabase
         .from('participantes')
         .select('id')
-        .eq('correo', correo)
-        .eq('nombre_completo', nombre)
+        .eq('correo', correoLimpio)
+        .eq('nombre_completo', nombreLimpio)
         .maybeSingle();
 
       if (existente) {
         setCargando(false);
-        return alert("⚠️ Ya existe un registro con este nombre y correo. Si no tienes tu QR, usa la opción 'Obtener mi QR'.");
+        return Swal.fire({
+          icon: 'info',
+          title: 'Registro ya existe',
+          text: 'Ya tenemos un registro con este nombre y correo. Si no tienes tu pase, usa la opción "Obtener mi QR".',
+          confirmButtonColor: '#007D5F'
+        });
       }
+
+      // 4. Configuración y subida del archivo (comprobante)
       const modalidadesMap = { 'Asistente': 1, 'Ponente': 2, 'Cartel': 3 };
       const extension = archivo.name.split('.').pop();
-      // Si no hay matrícula, usamos el nombre para el archivo
-      const idArchivo = matricula || nombre.replace(/\s+/g, '_').toLowerCase();
+      const idArchivo = matricula.trim() || nombreLimpio.replace(/\s+/g, '_').toLowerCase();
       const nombreArchivo = `${Date.now()}_${idArchivo}.${extension}`;
       
-      const { error: uploadError } = await supabase.storage.from('comprobantes').upload(nombreArchivo, archivo);
+      const { error: uploadError } = await supabase.storage
+        .from('comprobantes')
+        .upload(nombreArchivo, archivo);
+
       if (uploadError) throw uploadError;
       
-      const { data: urlData } = supabase.storage.from('comprobantes').getPublicUrl(nombreArchivo);
-      
-      
-     
+      const { data: urlData } = supabase.storage
+        .from('comprobantes')
+        .getPublicUrl(nombreArchivo);
 
+      // 5. Generación de matrícula si es invitado
+      const matriculaFinal = matricula.trim() === "" 
+        ? `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}` 
+        : matricula.trim();
 
-const matriculaFinal = matricula.trim() === "" 
-      ? `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}` 
-      : matricula;
+      // 6. Inserción final en la base de datos
+      const { error: dbError } = await supabase.from('participantes').insert([{
+        nombre_completo: nombreLimpio, 
+        matricula: matriculaFinal, 
+        escuela: escuela.trim(), 
+        correo: correoLimpio,
+        modalidad_id: modalidadesMap[modalidad], 
+        url_comprobante: urlData.publicUrl, 
+        estatus_pago: 'pendiente'
+      }]);
 
-    const { error: dbError } = await supabase.from('participantes').insert([{
-      nombre_completo: nombre, 
-      matricula: matriculaFinal, 
-      escuela, 
-      correo,
-      modalidad_id: modalidadesMap[modalidad], 
-      url_comprobante: urlData.publicUrl, 
-      estatus_pago: 'pendiente'
-    }]);
+      if (dbError) throw dbError;
 
-    if (dbError) throw dbError;
-      alert("¡Registro enviado con éxito! Validaremos tu pago pronto.");
+      // 7. Éxito
+      Swal.fire({
+        icon: 'success',
+        title: '¡Registro exitoso!',
+        text: 'Tu información ha sido enviada. Validaremos tu pago en las próximas horas.',
+        confirmButtonColor: '#007D5F',
+        timer: 4000
+      });
+
+      // Limpiar formulario y volver al inicio
+      setNombre('');
+      setMatricula('');
+      setCorreo('');
+      setConfirmarCorreo('');
+      setEscuela('');
+      setArchivo(null);
       setView('landing');
+
     } catch (error) { 
-        alert("Error: " + error.message); 
+      Swal.fire({
+        icon: 'error',
+        title: 'Hubo un error',
+        text: 'No pudimos completar tu registro: ' + error.message,
+        confirmButtonColor: '#d33'
+      });
     } finally { 
-        setCargando(false); 
+      setCargando(false); 
     }
   };
 
