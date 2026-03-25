@@ -80,7 +80,7 @@ function App() {
         .from('participantes')
         .select('id')
         .eq('correo', correoLimpio)
-        .eq('nombre_completo', nombreLimpio)
+        //.eq('nombre_completo', nombreLimpio)
         .maybeSingle();
 
       if (existente) {
