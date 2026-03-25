@@ -58,8 +58,20 @@ function App() {
       return alert("❌ Los correos electrónicos no coinciden.");
     }
 
-    setCargando(true);
+    
+    setCargando(true); 
     try {
+      const { data: existente, error: errorCheck } = await supabase
+        .from('participantes')
+        .select('id')
+        .eq('correo', correo)
+        .eq('nombre_completo', nombre)
+        .maybeSingle();
+
+      if (existente) {
+        setCargando(false);
+        return alert("⚠️ Ya existe un registro con este nombre y correo. Si no tienes tu QR, usa la opción 'Obtener mi QR'.");
+      }
       const modalidadesMap = { 'Asistente': 1, 'Ponente': 2, 'Cartel': 3 };
       const extension = archivo.name.split('.').pop();
       // Si no hay matrícula, usamos el nombre para el archivo
