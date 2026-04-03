@@ -48,21 +48,17 @@ function ScannerProtector() {
 function App() {
   const [view, setView] = useState('landing');
   const [nombre, setNombre] = useState('');
-  const [matricula, setMatricula] = useState('');
-  const [institucion, setInstitucion] = useState(''); // Nuevo
+  const [ponenciaCartel, setPonenciaCartel] = useState(''); 
+  const [institucion, setInstitucion] = useState('');
   const [correo, setCorreo] = useState('');
   const [confirmarCorreo, setConfirmarCorreo] = useState(''); 
   const [archivo, setArchivo] = useState(null);
   const [cargando, setCargando] = useState(false);
   
-  // Nuevos campos de logística
   const [tipoParticipacion, setTipoParticipacion] = useState('Asistente');
   const [modalidadAsistencia, setModalidadAsistencia] = useState('presencial');
-  const [tieneHospedaje, setTieneHospedaje] = useState('no');
-  const [detalleHospedaje, setDetalleHospedaje] = useState('');
 
   const manejarRegistro = async () => {
-    // 1. Validaciones
     if (!nombre || !institucion || !correo || !confirmarCorreo || !archivo) {
       return Swal.fire({
         icon: 'warning',
@@ -87,7 +83,7 @@ function App() {
       const nombreLimpio = nombre.trim();
       const correoLimpio = correo.trim().toLowerCase();
 
-      // 2. Bloqueo de duplicados por correo
+      // Verificar si ya existe
       const { data: existente } = await supabase
         .from('participantes')
         .select('id')
@@ -104,10 +100,10 @@ function App() {
         });
       }
 
-      // 3. Subida de archivo
+      // --- MEJORA: Nombre de archivo ULTRA SEGURO ---
       const extension = archivo.name.split('.').pop();
-      const idArchivo = matricula.trim() || nombreLimpio.replace(/\s+/g, '_').toLowerCase();
-      const nombreArchivo = `${Date.now()}_${idArchivo}.${extension}`;
+      // Usamos solo números y letras simples para evitar el error "Invalid Key"
+      const nombreArchivo = `comp_${Date.now()}_${Math.floor(Math.random() * 1000)}.${extension}`;
       
       const { error: uploadError } = await supabase.storage
         .from('comprobantes')
@@ -119,21 +115,20 @@ function App() {
         .from('comprobantes')
         .getPublicUrl(nombreArchivo);
 
-      // 4. Matrícula final
-      const matriculaFinal = matricula.trim() === "" 
-        ? `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}` 
-        : matricula.trim();
+      // --- MEJORA: Generación de Matrícula ---
+      const idInterno = `COI-${Date.now()}`;
 
-      // 5. Inserción en DB
+      // Inserción Final
       const { error: dbError } = await supabase.from('participantes').insert([{
         nombre_completo: nombreLimpio, 
-        matricula: matriculaFinal, 
+        matricula: idInterno, 
+        ponencia_cartel: ponenciaCartel.trim() || 'N/A', 
         institucion: institucion.trim(), 
         correo: correoLimpio,
         tipo_participacion: tipoParticipacion, 
         modalidad: modalidadAsistencia,
-        tiene_hospedaje: tieneHospedaje === 'si',
-        detalle_hospedaje: tieneHospedaje === 'si' ? detalleHospedaje : 'N/A',
+        tiene_hospedaje: false,
+        detalle_hospedaje: 'N/A',
         url_comprobante: urlData.publicUrl, 
         estatus_pago: 'pendiente'
       }]);
@@ -147,9 +142,9 @@ function App() {
         confirmButtonColor: '#007D5F'
       });
 
-      // Limpiar y resetear
-      setNombre(''); setMatricula(''); setCorreo(''); setConfirmarCorreo('');
-      setInstitucion(''); setArchivo(null); setDetalleHospedaje('');
+      // Limpiar estados
+      setNombre(''); setPonenciaCartel(''); setCorreo(''); setConfirmarCorreo('');
+      setInstitucion(''); setArchivo(null);
       setView('landing');
 
     } catch (error) { 
@@ -157,6 +152,7 @@ function App() {
     } finally { setCargando(false); }
   };
 
+  // ... El resto del return se mantiene igual ...
   return (
     <div className="min-h-screen bg-[#FDF5E6] text-slate-800 font-sans selection:bg-[#F2B705] selection:text-black overflow-x-hidden flex flex-col">
       <nav className="p-6 flex justify-between items-center relative z-20 border-b border-[#E5DCC5] bg-white">
@@ -168,7 +164,6 @@ function App() {
       <main className="flex-grow">
         {view === 'landing' && (
           <div className="animate-in fade-in duration-1000">
-            {/* HERO SECTION */}
             <section className="max-w-7xl mx-auto px-6 py-12 md:py-24 flex flex-col md:flex-row items-center gap-12 relative z-10">
               <div className="md:w-3/5 text-center md:text-left">
                 <h1 className="text-5xl md:text-7xl font-black leading-[0.9] mb-6 tracking-tighter italic text-slate-900">
@@ -191,13 +186,12 @@ function App() {
               </div>
             </section>
 
-            {/* SELECCION DE PARTICIPACION */}
             <section className="py-20 px-6 bg-[#F5E9D3] border-y border-[#E5DCC5]">
               <div className="max-w-7xl mx-auto text-center">
                 <h2 className="text-4xl font-black mb-16 uppercase italic tracking-widest text-[#007D5F]/60">Selecciona tu participación</h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   {['Ponente', 'Asistente', 'Cartel'].map((tipo) => (
-                    <div key={tipo} className={`p-10 rounded-[2.5rem] border transition-all ${tipo === 'Asistente' ? 'bg-[#007D5F] text-white scale-105 shadow-2xl border-[#32B58C]' : 'bg-white border-[#E5DCC5]'}`}>
+                    <div key={tipo} className={`p-10 rounded-[2.5rem] border transition-all relative ${tipo === 'Asistente' ? 'bg-[#007D5F] text-white scale-105 shadow-2xl border-[#32B58C]' : 'bg-white border-[#E5DCC5]'}`}>
                       {tipo === 'Asistente' && <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-[#F2B705] text-black text-[11px] font-black px-6 py-2 rounded-full uppercase">MÁS POPULAR</div>}
                       <div className="text-5xl mb-6">{tipo === 'Ponente' ? '🎙️' : tipo === 'Asistente' ? '👥' : '🖼️'}</div>
                       <h3 className="text-3xl font-black mb-4 uppercase">{tipo}</h3>
@@ -225,25 +219,21 @@ function App() {
               <p className="text-slate-400 mb-8 font-bold text-xs tracking-widest uppercase">Datos oficiales</p>
               
               <div className="space-y-6 text-left">
-                {/* NOMBRE */}
                 <div>
                   <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Nombre Completo <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="Ej. Juan Pérez" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20" onChange={(e) => setNombre(e.target.value)} />
+                  <input type="text" value={nombre} placeholder="Ej. Juan Pérez" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20" onChange={(e) => setNombre(e.target.value)} />
                 </div>
 
-                {/* INSTITUCION */}
                 <div>
                   <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Institución de Procedencia <span className="text-red-500">*</span></label>
-                  <input type="text" placeholder="Ej. UTD, ITD, UNAM" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20" onChange={(e) => setInstitucion(e.target.value)} />
+                  <input type="text" value={institucion} placeholder="Ej. UTD, ITD, UNAM" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none focus:ring-2 focus:ring-[#007D5F]/20" onChange={(e) => setInstitucion(e.target.value)} />
                 </div>
 
-                {/* MATRICULA */}
                 <div>
-                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Matrícula (Opcional)</label>
-                  <input type="text" placeholder="Tu matrícula UTD" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none" onChange={(e) => setMatricula(e.target.value)} />
+                  <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Nombre de Ponencia o Cartel (Opcional)</label>
+                  <input type="text" value={ponenciaCartel} placeholder="Título de tu trabajo" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none" onChange={(e) => setPonenciaCartel(e.target.value)} />
                 </div>
 
-                {/* MODALIDAD */}
                 <div>
                   <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Modalidad de Asistencia</label>
                   <select className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-5 rounded-2xl outline-none" onChange={(e) => setModalidadAsistencia(e.target.value)}>
@@ -252,34 +242,17 @@ function App() {
                   </select>
                 </div>
 
-                {/* CORREO */}
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2 text-[9px]">Correo Electrónico *</label>
-                    <input type="email" placeholder="correo@ej" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-4 rounded-2xl outline-none" onChange={(e) => setCorreo(e.target.value)} />
+                    <input type="email" value={correo} placeholder="correo@ej" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-4 rounded-2xl outline-none" onChange={(e) => setCorreo(e.target.value)} />
                   </div>
                   <div>
                     <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2 text-[9px]">Confirmar Correo *</label>
-                    <input type="email" placeholder="repite correo" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-4 rounded-2xl outline-none" onChange={(e) => setConfirmarCorreo(e.target.value)} />
+                    <input type="email" value={confirmarCorreo} placeholder="repite correo" className="w-full bg-[#FDF5E6] border border-[#E5DCC5] p-4 rounded-2xl outline-none" onChange={(e) => setConfirmarCorreo(e.target.value)} />
                   </div>
                 </div>
 
-                {/* HOSPEDAJE */}
-                <div className="p-6 bg-[#FDF5E6] rounded-3xl border border-[#E5DCC5]">
-                  <label className="block text-xs font-black text-slate-500 mb-4 uppercase text-center tracking-widest">¿Cuentas con hospedaje?</label>
-                  <div className="flex justify-around mb-4">
-                    {['si', 'no'].map((opc) => (
-                      <label key={opc} className="flex items-center gap-2 cursor-pointer font-bold uppercase text-xs">
-                        <input type="radio" name="hosp" value={opc} checked={tieneHospedaje === opc} onChange={(e) => setTieneHospedaje(e.target.value)} className="accent-[#007D5F]" /> {opc}
-                      </label>
-                    ))}
-                  </div>
-                  {tieneHospedaje === 'si' && (
-                    <input type="text" placeholder="¿En dónde te hospedarás?" className="w-full bg-white border border-[#E5DCC5] p-4 rounded-xl text-xs animate-in slide-in-from-top-2" onChange={(e) => setDetalleHospedaje(e.target.value)} />
-                  )}
-                </div>
-
-                {/* COMPROBANTE */}
                 <div className="bg-[#FDF5E6] p-6 rounded-2xl border-2 border-dashed border-[#E5DCC5] text-center">
                   <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-widest">Comprobante de Pago *</label>
                   <input type="file" accept="image/*" className="text-[10px]" onChange={(e) => setArchivo(e.target.files[0])} />

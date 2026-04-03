@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { supabase } from './lib/supabase';
 import { QRCodeSVG } from 'qrcode.react';
-import Swal from 'sweetalert2'; // Importamos SweetAlert
+import Swal from 'sweetalert2'; 
 
 function ConsultaQR() {
   const [busqueda, setBusqueda] = useState('');
