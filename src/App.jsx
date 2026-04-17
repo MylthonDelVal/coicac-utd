@@ -59,6 +59,7 @@ function App() {
   const [modalidadAsistencia, setModalidadAsistencia] = useState('presencial');
 
   const manejarRegistro = async () => {
+    // 1. Validación de campos vacíos
     if (!nombre || !institucion || !correo || !confirmarCorreo || !archivo) {
       return Swal.fire({
         icon: 'warning',
@@ -68,11 +69,35 @@ function App() {
       });
     }
 
+    // 2. Validación de correos iguales
     if (correo.trim().toLowerCase() !== confirmarCorreo.trim().toLowerCase()) {
       return Swal.fire({
         icon: 'error',
         title: 'Correos no coinciden',
         text: 'Los correos electrónicos ingresados no son iguales.',
+        confirmButtonColor: '#007D5F'
+      });
+    }
+
+    // --- 3. NUEVA VALIDACIÓN DE ARCHIVO (Extensión y Peso) ---
+    const extension = archivo.name.split('.').pop().toLowerCase();
+    const esImagen = ['jpg', 'jpeg', 'png'].includes(extension);
+    const esMuyPesado = archivo.size > 4 * 1024 * 1024; // Límite de 4MB para evitar fallos de red
+
+    if (!esImagen) {
+      return Swal.fire({
+        icon: 'error',
+        title: 'Formato no permitido',
+        text: 'Solo se aceptan imágenes (JPG, PNG). Por favor, no subas documentos de Word (.docx) o PDF.',
+        confirmButtonColor: '#007D5F'
+      });
+    }
+
+    if (esMuyPesado) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'Archivo muy pesado',
+        text: 'La foto es demasiado grande. Por favor, toma una captura de pantalla de tu comprobante y sube esa, suele ser más ligera.',
         confirmButtonColor: '#007D5F'
       });
     }
@@ -100,9 +125,7 @@ function App() {
         });
       }
 
-      // --- MEJORA: Nombre de archivo ULTRA SEGURO ---
-      const extension = archivo.name.split('.').pop();
-      // Usamos solo números y letras simples para evitar el error "Invalid Key"
+      // Nombre de archivo seguro
       const nombreArchivo = `comp_${Date.now()}_${Math.floor(Math.random() * 1000)}.${extension}`;
       
       const { error: uploadError } = await supabase.storage
@@ -115,7 +138,6 @@ function App() {
         .from('comprobantes')
         .getPublicUrl(nombreArchivo);
 
-      // --- MEJORA: Generación de Matrícula ---
       const idInterno = `COI-${Date.now()}`;
 
       // Inserción Final
@@ -148,11 +170,25 @@ function App() {
       setView('landing');
 
     } catch (error) { 
-      Swal.fire({ icon: 'error', title: 'Hubo un error', text: error.message });
-    } finally { setCargando(false); }
+      console.error("Detalle del error:", error);
+      let mensajeError = error.message;
+
+      if (mensajeError.includes('fetch') || mensajeError.includes('NetworkError')) {
+        mensajeError = "No se pudo conectar con el servidor. Esto pasa si tu internet es inestable o si el archivo es demasiado grande. ¡Intenta con una captura de pantalla!";
+      }
+
+      Swal.fire({ 
+        icon: 'error', 
+        title: 'Hubo un problema', 
+        text: mensajeError,
+        confirmButtonColor: '#007D5F'
+      });
+    } finally { 
+      setCargando(false); 
+    }
   };
 
-  // ... El resto del return se mantiene igual ...
+
   return (
     <div className="min-h-screen bg-[#FDF5E6] text-slate-800 font-sans selection:bg-[#F2B705] selection:text-black overflow-x-hidden flex flex-col">
       <nav className="p-6 flex justify-between items-center relative z-20 border-b border-[#E5DCC5] bg-white">
@@ -255,7 +291,12 @@ function App() {
 
                 <div className="bg-[#FDF5E6] p-6 rounded-2xl border-2 border-dashed border-[#E5DCC5] text-center">
                   <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-widest">Comprobante de Pago *</label>
-                  <input type="file" accept="image/*" className="text-[10px]" onChange={(e) => setArchivo(e.target.files[0])} />
+                  <input 
+                    type="file" 
+                    accept=".jpg, .jpeg, .png" 
+                    className="text-[10px]" 
+                    onChange={(e) => setArchivo(e.target.files[0])} 
+                  />
                 </div>
 
                 <button onClick={manejarRegistro} disabled={cargando} className="w-full py-6 bg-[#007D5F] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all uppercase hover:bg-[#32B58C]">
