@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from './lib/supabase'
 import Scanner from './Scanner'
 import Admin from './Admin'
@@ -58,25 +58,6 @@ function App() {
 
   const [tipoParticipacion, setTipoParticipacion] = useState('Asistente');
   const [modalidadAsistencia, setModalidadAsistencia] = useState('presencial');
-
-  // ✅ NUEVO: atajo de teclado oculto para acceder a Admin y Staff.
-  // Los botones del footer desaparecen; solo quien conoce el atajo puede acceder.
-  // Ctrl + Shift + A  →  Panel Admin
-  // Ctrl + Shift + S  →  Panel Staff / Scanner
-  useEffect(() => {
-    const manejarAtajo = (e) => {
-      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
-        e.preventDefault();
-        setView('admin');
-      }
-      if (e.ctrlKey && e.shiftKey && e.key === 'S') {
-        e.preventDefault();
-        setView('scanner');
-      }
-    };
-    window.addEventListener('keydown', manejarAtajo);
-    return () => window.removeEventListener('keydown', manejarAtajo);
-  }, []);
 
   const manejarRegistro = async () => {
     if (!nombre || !institucion || !correo || !confirmarCorreo || !archivo) {
@@ -284,11 +265,13 @@ function App() {
         </div>
       </main>
 
-      {/* ✅ CORRECCIÓN: botones Admin y Staff eliminados del footer público.
-          Acceso solo via atajo de teclado: Ctrl+Shift+A (Admin) / Ctrl+Shift+S (Staff) */}
       <footer className="w-full py-10 border-t border-[#E5DCC5] bg-white">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-slate-400 text-[10px] font-bold tracking-[0.2em] uppercase">© 2026 Universidad Tecnológica de Durango</p>
+          <div className="flex gap-8">
+            <button onClick={() => setView('scanner')} className="text-[10px] font-black text-slate-500 hover:text-[#007D5F] uppercase tracking-[0.2em]">🔒 Staff</button>
+            <button onClick={() => setView('admin')} className="text-[10px] font-black text-slate-500 hover:text-[#F2B705] uppercase tracking-[0.2em]">⚙️ Admin</button>
+          </div>
         </div>
       </footer>
     </div>
