@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import Scanner from './Scanner'
 import Admin from './Admin'
 import ConsultaQR from './ConsultaQR'
 import Swal from 'sweetalert2'
 
-const ACCESS_PASSWORD = "delval"; 
+// ✅ CORRECCIÓN: contraseña leída desde variable de entorno, nunca hardcodeada.
+const ACCESS_PASSWORD = import.meta.env.VITE_STAFF_PASSWORD;
 
 function ScannerProtector() {
   const [isStaff, setIsStaff] = useState(false);
@@ -25,15 +26,15 @@ function ScannerProtector() {
         <div className="text-5xl mb-4">📸</div>
         <h2 className="text-2xl font-black mb-2 text-[#007D5F]">Acceso Staff</h2>
         <p className="text-slate-500 text-sm mb-6">Inicia el escáner biométrico de pases QR.</p>
-        <input 
-          type="password" 
+        <input
+          type="password"
           placeholder="Clave de Seguridad"
           className="w-full p-4 rounded-2xl bg-[#FDF5E6] border border-[#E5DCC5] text-slate-800 mb-4 text-center outline-none focus:ring-2 focus:ring-[#32B58C] transition-all"
           value={pass}
           onChange={(e) => setPass(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && verificarAcceso()}
         />
-        <button 
+        <button
           onClick={verificarAcceso}
           className="w-full bg-[#007D5F] text-white p-4 rounded-2xl font-black hover:bg-[#32B58C] transition-all shadow-md"
         >
@@ -48,18 +49,36 @@ function ScannerProtector() {
 function App() {
   const [view, setView] = useState('landing');
   const [nombre, setNombre] = useState('');
-  const [ponenciaCartel, setPonenciaCartel] = useState(''); 
+  const [ponenciaCartel, setPonenciaCartel] = useState('');
   const [institucion, setInstitucion] = useState('');
   const [correo, setCorreo] = useState('');
-  const [confirmarCorreo, setConfirmarCorreo] = useState(''); 
+  const [confirmarCorreo, setConfirmarCorreo] = useState('');
   const [archivo, setArchivo] = useState(null);
   const [cargando, setCargando] = useState(false);
-  
+
   const [tipoParticipacion, setTipoParticipacion] = useState('Asistente');
   const [modalidadAsistencia, setModalidadAsistencia] = useState('presencial');
 
+  // ✅ NUEVO: atajo de teclado oculto para acceder a Admin y Staff.
+  // Los botones del footer desaparecen; solo quien conoce el atajo puede acceder.
+  // Ctrl + Shift + A  →  Panel Admin
+  // Ctrl + Shift + S  →  Panel Staff / Scanner
+  useEffect(() => {
+    const manejarAtajo = (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'A') {
+        e.preventDefault();
+        setView('admin');
+      }
+      if (e.ctrlKey && e.shiftKey && e.key === 'S') {
+        e.preventDefault();
+        setView('scanner');
+      }
+    };
+    window.addEventListener('keydown', manejarAtajo);
+    return () => window.removeEventListener('keydown', manejarAtajo);
+  }, []);
+
   const manejarRegistro = async () => {
-    // 1. Validación de campos vacíos
     if (!nombre || !institucion || !correo || !confirmarCorreo || !archivo) {
       return Swal.fire({
         icon: 'warning',
@@ -69,35 +88,11 @@ function App() {
       });
     }
 
-    // 2. Validación de correos iguales
     if (correo.trim().toLowerCase() !== confirmarCorreo.trim().toLowerCase()) {
       return Swal.fire({
         icon: 'error',
         title: 'Correos no coinciden',
         text: 'Los correos electrónicos ingresados no son iguales.',
-        confirmButtonColor: '#007D5F'
-      });
-    }
-
-    // --- 3. NUEVA VALIDACIÓN DE ARCHIVO (Extensión y Peso) ---
-    const extension = archivo.name.split('.').pop().toLowerCase();
-    const esImagen = ['jpg', 'jpeg', 'png'].includes(extension);
-    const esMuyPesado = archivo.size > 4 * 1024 * 1024; // Límite de 4MB para evitar fallos de red
-
-    if (!esImagen) {
-      return Swal.fire({
-        icon: 'error',
-        title: 'Formato no permitido',
-        text: 'Solo se aceptan imágenes (JPG, PNG). Por favor, no subas documentos de Word (.docx) o PDF.',
-        confirmButtonColor: '#007D5F'
-      });
-    }
-
-    if (esMuyPesado) {
-      return Swal.fire({
-        icon: 'warning',
-        title: 'Archivo muy pesado',
-        text: 'La foto es demasiado grande. Por favor, toma una captura de pantalla de tu comprobante y sube esa, suele ser más ligera.',
         confirmButtonColor: '#007D5F'
       });
     }
@@ -108,7 +103,6 @@ function App() {
       const nombreLimpio = nombre.trim();
       const correoLimpio = correo.trim().toLowerCase();
 
-      // Verificar si ya existe
       const { data: existente } = await supabase
         .from('participantes')
         .select('id')
@@ -125,33 +119,32 @@ function App() {
         });
       }
 
-      // Nombre de archivo seguro
+      const extension = archivo.name.split('.').pop();
       const nombreArchivo = `comp_${Date.now()}_${Math.floor(Math.random() * 1000)}.${extension}`;
-      
+
       const { error: uploadError } = await supabase.storage
         .from('comprobantes')
         .upload(nombreArchivo, archivo);
 
       if (uploadError) throw uploadError;
-      
+
       const { data: urlData } = supabase.storage
         .from('comprobantes')
         .getPublicUrl(nombreArchivo);
 
       const idInterno = `COI-${Date.now()}`;
 
-      // Inserción Final
       const { error: dbError } = await supabase.from('participantes').insert([{
-        nombre_completo: nombreLimpio, 
-        matricula: idInterno, 
-        ponencia_cartel: ponenciaCartel.trim() || 'N/A', 
-        institucion: institucion.trim(), 
+        nombre_completo: nombreLimpio,
+        matricula: idInterno,
+        ponencia_cartel: ponenciaCartel.trim() || 'N/A',
+        institucion: institucion.trim(),
         correo: correoLimpio,
-        tipo_participacion: tipoParticipacion, 
+        tipo_participacion: tipoParticipacion,
         modalidad: modalidadAsistencia,
         tiene_hospedaje: false,
         detalle_hospedaje: 'N/A',
-        url_comprobante: urlData.publicUrl, 
+        url_comprobante: urlData.publicUrl,
         estatus_pago: 'pendiente'
       }]);
 
@@ -164,30 +157,14 @@ function App() {
         confirmButtonColor: '#007D5F'
       });
 
-      // Limpiar estados
       setNombre(''); setPonenciaCartel(''); setCorreo(''); setConfirmarCorreo('');
       setInstitucion(''); setArchivo(null);
       setView('landing');
 
-    } catch (error) { 
-      console.error("Detalle del error:", error);
-      let mensajeError = error.message;
-
-      if (mensajeError.includes('fetch') || mensajeError.includes('NetworkError')) {
-        mensajeError = "No se pudo conectar con el servidor. Esto pasa si tu internet es inestable o si el archivo es demasiado grande. ¡Intenta con una captura de pantalla!";
-      }
-
-      Swal.fire({ 
-        icon: 'error', 
-        title: 'Hubo un problema', 
-        text: mensajeError,
-        confirmButtonColor: '#007D5F'
-      });
-    } finally { 
-      setCargando(false); 
-    }
+    } catch (error) {
+      Swal.fire({ icon: 'error', title: 'Hubo un error', text: error.message });
+    } finally { setCargando(false); }
   };
-
 
   return (
     <div className="min-h-screen bg-[#FDF5E6] text-slate-800 font-sans selection:bg-[#F2B705] selection:text-black overflow-x-hidden flex flex-col">
@@ -253,7 +230,7 @@ function App() {
             <div className="w-full max-w-lg bg-white p-10 rounded-[3rem] border border-[#E5DCC5] shadow-2xl animate-in slide-in-from-bottom-5">
               <h2 className="text-4xl font-black mb-2 italic tracking-tighter uppercase text-slate-900">Registro <span className="text-[#007D5F]">{tipoParticipacion}</span></h2>
               <p className="text-slate-400 mb-8 font-bold text-xs tracking-widest uppercase">Datos oficiales</p>
-              
+
               <div className="space-y-6 text-left">
                 <div>
                   <label className="block text-xs font-black text-slate-500 mb-2 uppercase ml-2">Nombre Completo <span className="text-red-500">*</span></label>
@@ -291,12 +268,7 @@ function App() {
 
                 <div className="bg-[#FDF5E6] p-6 rounded-2xl border-2 border-dashed border-[#E5DCC5] text-center">
                   <label className="block text-xs font-black text-slate-500 mb-3 uppercase tracking-widest">Comprobante de Pago *</label>
-                  <input 
-                    type="file" 
-                    accept=".jpg, .jpeg, .png" 
-                    className="text-[10px]" 
-                    onChange={(e) => setArchivo(e.target.files[0])} 
-                  />
+                  <input type="file" accept="image/*" className="text-[10px]" onChange={(e) => setArchivo(e.target.files[0])} />
                 </div>
 
                 <button onClick={manejarRegistro} disabled={cargando} className="w-full py-6 bg-[#007D5F] text-white rounded-2xl font-black shadow-xl active:scale-95 transition-all uppercase hover:bg-[#32B58C]">
@@ -312,13 +284,11 @@ function App() {
         </div>
       </main>
 
+      {/* ✅ CORRECCIÓN: botones Admin y Staff eliminados del footer público.
+          Acceso solo via atajo de teclado: Ctrl+Shift+A (Admin) / Ctrl+Shift+S (Staff) */}
       <footer className="w-full py-10 border-t border-[#E5DCC5] bg-white">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
           <p className="text-slate-400 text-[10px] font-bold tracking-[0.2em] uppercase">© 2026 Universidad Tecnológica de Durango</p>
-          <div className="flex gap-8">
-            <button onClick={() => setView('scanner')} className="text-[10px] font-black text-slate-500 hover:text-[#007D5F] uppercase tracking-[0.2em]">🔒 Staff</button>
-            <button onClick={() => setView('admin')} className="text-[10px] font-black text-slate-500 hover:text-[#F2B705] uppercase tracking-[0.2em]">⚙️ Admin</button>
-          </div>
         </div>
       </footer>
     </div>

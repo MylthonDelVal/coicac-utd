@@ -1,12 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { supabase } from './lib/supabase';
-import Swal from 'sweetalert2'; 
+import Swal from 'sweetalert2';
 
 function Scanner() {
   const [diaActual, setDiaActual] = useState(1);
   const [status, setStatus] = useState('Listo para escanear');
-  const [isScanning, setIsScanning] = useState(false);
+
+  // ✅ CORRECCIÓN: useRef en lugar de useState para el flag de escaneo.
+  // Con useState el closure dentro de scanner.render capturaba el valor
+  // inicial (false) y nunca veía las actualizaciones. useRef siempre
+  // apunta al valor más reciente sin necesidad de estar en dependencias.
+  const isScanning = useRef(false);
 
   useEffect(() => {
     const scanner = new Html5QrcodeScanner('reader', {
@@ -15,9 +20,9 @@ function Scanner() {
     });
 
     scanner.render(async (decodedText) => {
-      if (isScanning) return; 
-      
-      setIsScanning(true);
+      if (isScanning.current) return;
+
+      isScanning.current = true;
       setStatus('Validando registro...');
 
       try {
@@ -37,7 +42,7 @@ function Scanner() {
             background: '#1e293b',
             color: '#fff'
           });
-          setIsScanning(false);
+          isScanning.current = false;
           return;
         }
 
@@ -51,7 +56,7 @@ function Scanner() {
             background: '#1e293b',
             color: '#fff'
           });
-          setIsScanning(false);
+          isScanning.current = false;
           return;
         }
 
@@ -92,23 +97,22 @@ function Scanner() {
         console.error(err);
         setStatus('❌ ERROR DE CONEXIÓN');
       } finally {
-        setIsScanning(false);
+        isScanning.current = false;
         setStatus('Listo para el siguiente...');
       }
     });
 
     return () => scanner.clear();
-  }, [diaActual, isScanning]);
+  // ✅ diaActual es la única dependencia real del efecto ahora.
+  // isScanning ya no necesita estar aquí porque es un ref.
+  }, [diaActual]);
 
   return (
     <div className="bg-slate-800 p-8 rounded-[3rem] border border-slate-700 shadow-2xl w-full max-w-lg mx-auto text-center">
-      
-      {/* INICIO DEL BLOQUE DE ESTILOS FORZADOS */}
+
       <style>{`
-        #reader {
-          border: none !important;
-        }
-        #reader__dashboard_section_csr button, 
+        #reader { border: none !important; }
+        #reader__dashboard_section_csr button,
         #reader__dashboard_section_csr span,
         #reader__camera_selection,
         #reader__dashboard_section_fs a,
@@ -119,10 +123,7 @@ function Scanner() {
           font-weight: bold !important;
           font-size: 14px !important;
         }
-        #reader img {
-          display: block;
-          margin: 0 auto 10px auto;
-        }
+        #reader img { display: block; margin: 0 auto 10px auto; }
         #reader button {
           background-color: #f3f4f6 !important;
           border: 1px solid #ccc !important;
@@ -132,18 +133,16 @@ function Scanner() {
           cursor: pointer !important;
         }
       `}</style>
-      {/* FIN DEL BLOQUE DE ESTILOS */}
 
       <h2 className="text-3xl font-black mb-6 text-white uppercase italic tracking-tighter">
         Escáner <span className="text-emerald-500 text-3xl">Staff</span>
       </h2>
-      
 
       <div className="flex gap-2 mb-8 bg-slate-900 p-1.5 rounded-2xl border border-slate-700 shadow-inner">
         {[1, 2, 3].map(d => (
-          <button 
-            key={d} 
-            onClick={() => setDiaActual(d)} 
+          <button
+            key={d}
+            onClick={() => setDiaActual(d)}
             className={`flex-1 py-4 rounded-xl font-black transition-all text-xs tracking-widest ${diaActual === d ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
           >
             DÍA {d}
@@ -152,10 +151,10 @@ function Scanner() {
       </div>
 
       <div id="reader" className="mx-auto overflow-hidden rounded-[2.5rem] border-8 border-slate-900 bg-white shadow-2xl max-w-sm p-4"></div>
-      
+
       <p className={`mt-8 font-black uppercase tracking-[0.3em] text-[10px] transition-colors ${
-        status.includes('✅') ? 'text-emerald-400' : 
-        status.includes('❌') || status.includes('🚨') || status.includes('⛔') ? 'text-rose-500' : 
+        status.includes('✅') ? 'text-emerald-400' :
+        status.includes('❌') || status.includes('🚨') || status.includes('⛔') ? 'text-rose-500' :
         'text-slate-500'
       }`}>
         {status}
